@@ -1,5 +1,5 @@
 var BUTTERFLIES = [],
-    BUTTERFLY_MAX = 1,
+    BUTTERFLY_MAX = 10,
     a_butterfly = null;
 
 function randomInt(limit) {
@@ -8,8 +8,10 @@ function randomInt(limit) {
 }
 
 function projected_point(point, direction, range) {
-  var alpha = direction * Math.PI / 4;
-  return [point[0] + (range * Math.sin(alpha)), point[1] - (this.range * Math.cos(alpha))];
+  var alpha = direction * Math.PI / 4,
+      x = point[0] + (range * Math.sin(alpha)),
+      y = point[1] - (range * Math.cos(alpha));
+  return [x, y];
 }
 
 function rotate_left(directon, count) {
@@ -109,7 +111,7 @@ function EyeSense(butterfly, side) {
         field_of_vision = [
           origin,
           projected_point(origin, this.direction, this.range),
-          projected_point(origin, ((this.side === 'left') ? rotate_left(this.direction, 2) : rotate_right(this.direction, 2)), this.range)
+          projected_point(origin, ((this.side === 'left') ? rotate_left(this.direction, 1) : rotate_right(this.direction, 1)), this.range)
         ],
         doc = $(document);
     // do any of the screen edges intersect with the field_of_vision?
@@ -125,7 +127,7 @@ function EyeSense(butterfly, side) {
   };
   this.go = function() {
     if (this.see) {
-      console.log("butterfly " + this.butterfly.id + "can see the edge.", this.butterfly);
+      // console.log("butterfly " + this.butterfly.id + "can see the edge.", this.butterfly);
       if (this.speed > 0) this.butterfly.urges['decelerate'].excite();
       if (this.side === 'left') this.butterfly.urges['turn-right'].excite()
       else  this.butterfly.urges['turn-left'].excite();
@@ -133,7 +135,7 @@ function EyeSense(butterfly, side) {
       this.butterfly.urges['accelerate'].excite();
       this.butterfly.urges['move'].excite();
     }
-    // this.butterfly.urges['move'].excite();
+    this.butterfly.urges['move'].excite();
   }
 }
 
@@ -206,7 +208,7 @@ function lifecycle() {
   for (var i in BUTTERFLIES) {
     BUTTERFLIES[i].go();
   }
-  setTimeout(lifecycle, 1000);
+  setTimeout(lifecycle, 100);
 }
 
 $(document).ready(function() {
@@ -214,4 +216,9 @@ $(document).ready(function() {
     a_butterfly = new Butterfly();
   }
   lifecycle();
+  
+  // tests
+  // for (var i = 0; i < 8; i++) {
+  //   console.log('pp['+i+'] = ', projected_point([500,500], i, 200));
+  // }
 });
