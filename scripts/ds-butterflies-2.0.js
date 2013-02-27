@@ -188,18 +188,19 @@ function EyeSense(butterfly, side) {
     pro: function() {
       var self = this.parent;
       // console.log('mouse is ' + self.side + ' of butterfly.', self.butterfly.urges['turn-' + self.side]);
-      self.butterfly.urges['turn-' + self.side].excite()
+      self.butterfly.urges['turn-' + self.side].excite();
+      self.butterfly.urges['accelerate'].excite();
     },
     anti: function() {
       var self = this.parent;
-      // do nothing
+      if (self.butterfly.speed > 0) self.butterfly.urges['decelerate'].excite();
     }
   };
   this.go = function() {
     if (this.repel.test()) this.repel.pro()
     else this.repel.anti();
-    if (this.attract.test()) this.attract.pro();
-    //else this.attract.anti();
+    if (this.attract.test()) this.attract.pro()
+    else this.attract.anti();
     this.butterfly.urges['move'].excite();
   }
 }
@@ -333,19 +334,32 @@ function Butterfly() {
 }
 
 function lifecycle() {
-  if (BUTTERFLIES.length < BUTTERFLY_MAX) {
+  if (BUTTERFLIES.length < BUTTERFLY_MAX && randomInt(BUTTERFLY_MAX) > BUTTERFLIES.length) {
     a_butterfly = new Butterfly();
   }
   for (var i in BUTTERFLIES) {
     BUTTERFLIES[i].go();
   }
-  setTimeout(lifecycle, 50);
+  setTimeout(lifecycle, 20);
 }
 
 $(document).ready(function() {
+  $("body").css({
+    'cursor': "none",
+    'background': 'url(images/starfield' + (window.devicePixelRatio > 1 ? '@2x' : '') + '.jpg) no-repeat center center fixed',
+    'background-size': 'cover',
+    'overflow': 'hidden'
+  }).append($('<div id="light" style="position:absolute; width: 100px; height: 100px; top: 0px; left: 0px; background-image:url(images/light' +
+                (window.devicePixelRatio > 1 ? '@2x' : '') + '.png); background-position: center; background-repeat: no-repeat"></div>'));
+
   $(document).mousemove(function(event) {
     MOUSE = {left: event.pageX, top: event.pageY};
+    $("#light").css({
+      top: event.pageY - 50,
+      left: event.pageX - 50
+    });
   });
+
   lifecycle();
   
   /* 
