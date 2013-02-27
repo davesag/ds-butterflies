@@ -1,6 +1,7 @@
 var BUTTERFLIES = [],
     BUTTERFLY_MAX = 10,
-    a_butterfly = null;
+    a_butterfly = null,
+    MOUSE = {top: -1, left: -1};
 
 function randomInt(limit) {
   // returns a random integer between 1 and 'limit'
@@ -14,13 +15,32 @@ function projected_point(point, direction, range) {
   return [x, y];
 }
 
-function rotate_left(directon, count) {
+function side_of_line(point, line) {
+  if (point.left === -1 && point.top === -1) return '';
+  var x = point.left,
+      y = point.top,
+      lax = line[0][0],
+      lay = line[0][1],
+      lbx = line[1][0],
+      lby = line[1][1],
+      // result = ((lbx - lax)*(y - lay) - (lby - lay)*(x - lax));
+      result = ((lbx - lax)*(lay - y) - (lay - lby)*(x - lax));
+
+  // console.log("testing mouse location.", point, line, result);
+  // console.log("testing mouse location.", x, y, lax, lay, lbx, lby);
+
+  if (result > 0) return 'left'
+  else if (result < 0) return 'right'
+  else return '';
+}
+
+function rotate_left(direction, count) {
   var result = direction - count;
   if (result < 0) result += 7;
   return result;
 }
 
-function rotate_right(directon, count) {
+function rotate_right(direction, count) {
   var result = direction + count;
   if (result > 7) result -= 7;
   return result;
@@ -36,7 +56,6 @@ function AbstractUrge(butterfly) {
   };
   this.excite = function() {
     if (++this.energy > this.threshold) this.threshold++
-    this.go();
   };
   this.depress= function() {
     this.energy = 0;
@@ -100,41 +119,87 @@ function DecelerateUrge(butterfly) {
 // else stimulate the accelerate urge.
 // eyes can see the edge of the window, and other butterflies.
 function EyeSense(butterfly, side) {
+  var $this = this;
   this.butterfly = butterfly;
   this.side = side;
   this.range = 200;         // 200px.
-  this.see = function() {
-    // return true if this eye can 'see' the edge or another butterfly.
-    var pos = this.butterfly.position(),
-        alpha = this.direction * Math.PI / 4,
-        origin = [pos.left, pos.top],
-        field_of_vision = [
-          origin,
-          projected_point(origin, this.direction, this.range),
-          projected_point(origin, ((this.side === 'left') ? rotate_left(this.direction, 1) : rotate_right(this.direction, 1)), this.range)
-        ],
-        doc = $(document);
-    // do any of the screen edges intersect with the field_of_vision?
+  this.repel = {
+    parent: $this,
+    test: function() {
+      var self = this.parent,
+          pos = self.butterfly.position(),
+          alpha = self.butterfly.direction * Math.PI / 4,
+          origin = [pos.left + (123/2), pos.top + (123/2)],
+          field_of_vision = [
+            projected_point(origin, self.butterfly.direction, self.range),
+            projected_point(origin, ((self.side === 'left') ? rotate_left(self.butterfly.direction, 1) : rotate_right(self.butterfly.direction, 1)), self.range)
+          ],
+          win = $(window);
+      // do any of the screen edges intersect with the field_of_vision?
+      // console.log('repel sense for ' + self.side + ' being tested.', self, field_of_vision);
+      for (var i in field_of_vision) {
+        var p = field_of_vision[i];
+        if (p[0] < 0 || p[0] > win.width()) return true;
+        if (p[1] < 0 || p[1] > win.height()) return true;
+        for (var b in BUTTERFLIES) {
+          if (!this.id === b) {
+            if (BUTTERFLIES[b].contains({top: p[0], left: p[1]})) return true;
+          }
+        }
+      }
     
-    for (var i in field_of_vision) {
-      var p = field_of_vision[i];
-      if (p[0] < 0 || p[0] > doc.width()) return true;
-      if (p[1] < 0 || p[1] > doc.height()) return true;
+      return false;
+    },
+    pro: function() {
+      var self = this.parent;
+      if (self.butterfly.speed > 0) self.butterfly.urges['decelerate'].excite();
+      if (self.side === 'left') self.butterfly.urges['turn-right'].excite()
+      else  self.butterfly.urges['turn-left'].excite();
+      // console.log('repel sense for ' + self.side + ' triggered.', self);
+    },
+    anti: function() {
+      var self = this.parent;
+      self.butterfly.urges['accelerate'].excite();
+      self.butterfly.urges['move'].excite();
     }
-    // are any other butterflies in the field of vision?
-    
-    return false;
+  };
+  this.attract = {
+    parent: $this,
+    test: function() {
+      var self = this.parent,
+          pos = self.butterfly.position(),
+          alpha = self.butterfly.direction * Math.PI / 4,
+          origin = [pos.left + (123/2), pos.top + (123/2)],
+          line_of_sight = [
+            origin,
+            projected_point(origin, self.butterfly.direction, self.range)
+          ],
+          tangent = [
+            origin,
+            projected_point(origin, rotate_left(self.butterfly.direction, 2), self.range)
+          ],
+          mouse_side = side_of_line(MOUSE, line_of_sight),
+          mouse_facing = (side_of_line(MOUSE, tangent) === 'left' ? 'front' : 'back'),
+          result = (self.side === mouse_side && mouse_facing === 'front');
+      // console.log('mouse is to the ' + mouse_side + ' and ' + mouse_facing + 
+      //            ' of butterfly', MOUSE, {pos: self.butterfly.position(), dir: self.butterfly.direction});
+      return result;
+    },
+    pro: function() {
+      var self = this.parent;
+      // console.log('mouse is ' + self.side + ' of butterfly.', self.butterfly.urges['turn-' + self.side]);
+      self.butterfly.urges['turn-' + self.side].excite()
+    },
+    anti: function() {
+      var self = this.parent;
+      // do nothing
+    }
   };
   this.go = function() {
-    if (this.see) {
-      // console.log("butterfly " + this.butterfly.id + "can see the edge.", this.butterfly);
-      if (this.speed > 0) this.butterfly.urges['decelerate'].excite();
-      if (this.side === 'left') this.butterfly.urges['turn-right'].excite()
-      else  this.butterfly.urges['turn-left'].excite();
-    } else {
-      this.butterfly.urges['accelerate'].excite();
-      this.butterfly.urges['move'].excite();
-    }
+    if (this.repel.test()) this.repel.pro()
+    else this.repel.anti();
+    if (this.attract.test()) this.attract.pro();
+    //else this.attract.anti();
     this.butterfly.urges['move'].excite();
   }
 }
@@ -143,17 +208,30 @@ function Butterfly() {
   this.id = BUTTERFLIES.length;
   BUTTERFLIES.push(this);
   this.direction = randomInt(8) - 1; // facing top.
-  this.speed = 10;     // stationary
+  this.speed = 50;     // stationary
+  this.health = 100;
   this.container = $('<div id="butterfly_' + this.id +
     '" style="padding:0; margin:0; position: absolute; height: 123px; width: 123px; top:' + 
-    (randomInt($(document).height() - 153) + 20) + 'px; left: ' + 
-    (randomInt($(document).width() - 153) + 20)+ 'px; background-image: url(images/butterfly' +
+    (randomInt($(window).height() - 153) + 20) + 'px; left: ' + 
+    (randomInt($(window).width() - 153) + 20)+ 'px; background-image: url(images/butterfly' +
     this.direction + '.gif);"></div>');
   $("body").append(this.container);
   this.last_update = new Date();
   this.position = function() {
     return this.container.position();
-  }
+  };
+  this.die = function() {
+    // kill this butterfly.
+    // console.log('butterfly ' + this.id + ' has died.');
+    BUTTERFLIES.splice(this.id, 1);
+    for (var i in BUTTERFLIES) {
+      BUTTERFLIES[i].id = i;  // re-map the ids to the array index.
+    }
+    this.container.hide();
+    this.container.remove();
+    delete this.container;
+    delete this;
+  };
   this.senses = {
     left_eye: new EyeSense(this, 'left'),
     right_eye: new EyeSense(this, 'right')
@@ -174,11 +252,17 @@ function Butterfly() {
         distance = t * this.speed,
         distance_x = distance * Math.sin(alpha),
         distance_y = -distance * Math.cos(alpha),
-        offset = this.container.offset();
-    this.container.offset({
-      top: offset.top + distance_y,
-      left: offset.left + distance_x
-    });
+        offset = this.container.offset(),
+        new_pos = {
+          top: offset.top + distance_y,
+          left: offset.left + distance_x
+        };
+    if (this.no_collisions(new_pos)) {
+      this.container.offset(new_pos);
+    } else {
+      // console.log('butterfly[' + this.id + '] (health = ' + this.health + ' says "Ouch!"');
+      this.health--;
+    }
     this.last_update = update_time;
   };
   this.turn_left = function() {
@@ -199,26 +283,82 @@ function Butterfly() {
   };
   this.go = function() {
     // console.log("performing lifecycle actions for butterfly " + this.id, this);
-    this.senses.left_eye.go();
-    this.senses.right_eye.go();
+    // check health
+    if (this.health < 0) {
+      this.die();
+    } else {
+      this.senses.left_eye.go();
+      this.senses.right_eye.go();
+      // now run each urge in a random order.
+      var urges = Object.keys(this.urges),
+          urge = null, urge_name = null, urge_index = 0;
+      while (urges.length > 0) {
+        urge_index = randomInt(urges.length) - 1;
+        urge_name = urges[urge_index];
+        urge = this.urges[urge_name];
+        // console.log('running urge[' + urge_index + '] (' + urge_name + ')', urge);
+        urge.go();
+        urges.splice(urge_index,1);
+      }
+    }
+  };
+  this.contains = function(position) {
+    var my_pos = this.position(),
+        top = my_pos.top,
+        bottom = top + 123,
+        left = my_pos.left,
+        right = left + 123,
+        x = position.left,
+        y = position.top;
+    if (x > left && x < right && y > top && y < bottom) return true
+    else return false;
+  };
+  this.no_collisions = function(new_pos) {
+    var x = new_pos.left,
+        y = new_pos.top,
+        win = $(window);
+        max_x = win.width() - 123,
+        max_y = win.height() - 123;
+    // console.log('x = ' + x + '/' + max_x + ', y = ' + y + '/'+ max_y); 
+    // check page edges.
+    if (x < 0 || x > max_x || y < 0 || y > max_y) return false;
+  
+    for (var b in BUTTERFLIES) {
+      if (!this.id === b) {
+        if (BUTTERFLIES[b].contains(new_pos)) return false;
+      }
+    }
+    return true;
   }
 }
 
 function lifecycle() {
+  if (BUTTERFLIES.length < BUTTERFLY_MAX) {
+    a_butterfly = new Butterfly();
+  }
   for (var i in BUTTERFLIES) {
     BUTTERFLIES[i].go();
   }
-  setTimeout(lifecycle, 100);
+  setTimeout(lifecycle, 50);
 }
 
 $(document).ready(function() {
-  for (var i = 0; i < BUTTERFLY_MAX; i++) {
-    a_butterfly = new Butterfly();
-  }
+  $(document).mousemove(function(event) {
+    MOUSE = {left: event.pageX, top: event.pageY};
+  });
   lifecycle();
   
-  // tests
-  // for (var i = 0; i < 8; i++) {
-  //   console.log('pp['+i+'] = ', projected_point([500,500], i, 200));
-  // }
+  /* 
+  // test side_of_line method.
+  var mouse = {top: 500, left: 500},
+      origin = [510, 510],
+      axis = projected_point(origin, 0, 200),
+      tangent = projected_point(origin, 2, 200),
+      side = side_of_line(mouse, [origin, axis]),
+      facing = side_of_line(mouse, [origin, tangent]) === 'left' ? 'front' : 'back';
+  
+  console.assert(facing === 'front', "expected facing to be 'front' but it's '" + facing + "'.")
+  console.assert(side === 'left', "expected mouse to be to the left of origin but it's to the " + side)
+  */
+  
 });
