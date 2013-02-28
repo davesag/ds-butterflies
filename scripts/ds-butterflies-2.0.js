@@ -1,3 +1,6 @@
+// butterflies 2.0 by Dave Sag
+// See source code repository at https://github.com/davesag/ds-butterflies
+
 var BUTTERFLIES = [],
     BUTTERFLY_MAX = 10,
     a_butterfly = null,
