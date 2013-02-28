@@ -62,7 +62,7 @@ function AbstractUrge(butterfly) {
     this.threshold = 0;
   };
   this.idle = function() {
-    if (randomInt(this.threshold) < (this.threshold - this.energy)) this.threshold--
+    if ((randomInt(this.threshold) < (this.threshold - this.energy)) && this.threshold > 0) this.threshold--
   };
   this.action = function() {};
   this.go = function() {
@@ -70,7 +70,7 @@ function AbstractUrge(butterfly) {
       // console.log('urge fired for', this);
       this.depress();
       this.action();
-    }
+    } else this.idle();
   }
 }
 
@@ -288,8 +288,13 @@ function Butterfly() {
     if (this.health < 0) {
       this.die();
     } else {
-      this.senses.left_eye.go();
-      this.senses.right_eye.go();
+      if (randomInt(2) === 1) {
+        this.senses.left_eye.go();
+        this.senses.right_eye.go();
+      } else {
+        this.senses.right_eye.go();
+        this.senses.left_eye.go();
+      }
       // now run each urge in a random order.
       var urges = Object.keys(this.urges),
           urge = null, urge_name = null, urge_index = 0;
