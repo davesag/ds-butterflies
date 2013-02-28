@@ -1,7 +1,43 @@
 var BUTTERFLIES = [],
     BUTTERFLY_MAX = 10,
     a_butterfly = null,
-    MOUSE = {top: -1, left: -1};
+    MOUSE = {top: -1, left: -1},
+    max_wait_time = 120,
+    start_time = new Date(),
+    sprites = [], sprite = null;
+
+// preload sprites.
+for (var i = 0; i < 8; i++) {
+  sprite = new Image();
+  sprite.src = 'images/butterfly' + i + '.gif'
+  sprites.push(sprite);
+  // console.log('found sprite', sprites[sprites.length -1]);
+}
+
+// halt until all sprites are pre-loaded.
+function force_load_all_sprites() {
+	var count = (new Date() - start_time) / 1000,
+	    good_to_go = false;
+
+	if (count < max_wait_time) {
+		good_to_go = true;
+		drop_out:
+			for (var i = 0; i < 8; i++) {
+        good_to_go &= sprites[i].complete;
+        if (!good_to_go) break drop_out;
+			}
+		if (!good_to_go) setTimeout(force_load_all_sprites,5000);
+	} else {
+		// timeout - the images took far too long to load.
+		if (confirm("The images seem to be loading a bit too slowly. Would you like to keep trying?")) {
+			start_time = new Date();
+			setTimeout(force_load_all_sprites,5000)
+		} else {
+		  alert("Okay then, seeya!");
+		  window.location = 'http://cv.davesag.com/index.html'
+		}
+	}
+}
 
 function randomInt(limit) {
   // returns a random integer between 1 and 'limit'
@@ -364,7 +400,8 @@ $(document).ready(function() {
       left: event.pageX - 50
     });
   });
-
+  
+  force_load_all_sprites();
   lifecycle();
   
   /* 
