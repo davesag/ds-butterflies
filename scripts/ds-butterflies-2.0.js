@@ -7,14 +7,15 @@ var BUTTERFLIES = [],
     MOUSE = {top: -1, left: -1},
     max_wait_time = 120,
     start_time = new Date(),
-    sprites = [], sprite = null;
+    sprites = [], sprite = null,
+    is_retina = (window.devicePixelRatio > 1);
 
 // preload sprites.
 for (var i = 0; i < 8; i++) {
   sprite = new Image();
   sprite.src = 'images/butterfly' + i + '.gif'
   sprites.push(sprite);
-  // console.log('found sprite', sprites[sprites.length -1]);
+  // console.debug('found sprite', sprites[sprites.length -1]);
 }
 
 // halt until all sprites are pre-loaded.
@@ -65,8 +66,8 @@ function side_of_line(point, line) {
       // result = ((lbx - lax)*(y - lay) - (lby - lay)*(x - lax));
       result = ((lbx - lax)*(lay - y) - (lay - lby)*(x - lax));
 
-  // console.log("testing mouse location.", point, line, result);
-  // console.log("testing mouse location.", x, y, lax, lay, lbx, lby);
+  // console.debug("testing mouse location.", point, line, result);
+  // console.debug("testing mouse location.", x, y, lax, lay, lbx, lby);
 
   if (result > 0) return 'left'
   else if (result < 0) return 'right'
@@ -106,7 +107,7 @@ function AbstractUrge(butterfly) {
   this.action = function() {};
   this.go = function() {
     if (this.fire()) {
-      // console.log('urge fired for', this);
+      // console.debug('urge fired for', this);
       this.depress();
       this.action();
     } else this.idle();
@@ -175,7 +176,7 @@ function EyeSense(butterfly, side) {
           ],
           win = $(window);
       // do any of the screen edges intersect with the field_of_vision?
-      // console.log('repel sense for ' + self.side + ' being tested.', self, field_of_vision);
+      // console.debug('repel sense for ' + self.side + ' being tested.', self, field_of_vision);
       for (var i in field_of_vision) {
         var p = field_of_vision[i];
         if (p[0] < 0 || p[0] > win.width()) return true;
@@ -194,7 +195,7 @@ function EyeSense(butterfly, side) {
       if (self.butterfly.speed > 0) self.butterfly.urges['decelerate'].excite();
       if (self.side === 'left') self.butterfly.urges['turn-right'].excite()
       else  self.butterfly.urges['turn-left'].excite();
-      // console.log('repel sense for ' + self.side + ' triggered.', self);
+      // console.debug('repel sense for ' + self.side + ' triggered.', self);
     },
     anti: function() {
       var self = this.parent;
@@ -220,13 +221,13 @@ function EyeSense(butterfly, side) {
           mouse_side = side_of_line(MOUSE, line_of_sight),
           mouse_facing = (side_of_line(MOUSE, tangent) === 'left' ? 'front' : 'back'),
           result = (self.side === mouse_side && mouse_facing === 'front');
-      // console.log('mouse is to the ' + mouse_side + ' and ' + mouse_facing + 
+      // console.debug('mouse is to the ' + mouse_side + ' and ' + mouse_facing + 
       //            ' of butterfly', MOUSE, {pos: self.butterfly.position(), dir: self.butterfly.direction});
       return result;
     },
     pro: function() {
       var self = this.parent;
-      // console.log('mouse is ' + self.side + ' of butterfly.', self.butterfly.urges['turn-' + self.side]);
+      // console.debug('mouse is ' + self.side + ' of butterfly.', self.butterfly.urges['turn-' + self.side]);
       self.butterfly.urges['turn-' + self.side].excite();
       self.butterfly.urges['accelerate'].excite();
     },
@@ -238,8 +239,10 @@ function EyeSense(butterfly, side) {
   this.go = function() {
     if (this.repel.test()) this.repel.pro()
     else this.repel.anti();
-    if (this.attract.test()) this.attract.pro()
-    else this.attract.anti();
+    if ($("#light").is(":visible")) {
+      if (this.attract.test()) this.attract.pro()
+      else this.attract.anti();
+    }
     this.butterfly.urges['move'].excite();
   }
 }
@@ -262,7 +265,7 @@ function Butterfly() {
   };
   this.die = function() {
     // kill this butterfly.
-    // console.log('butterfly ' + this.id + ' has died.');
+    // console.debug('butterfly ' + this.id + ' has died.');
     BUTTERFLIES.splice(this.id, 1);
     for (var i in BUTTERFLIES) {
       BUTTERFLIES[i].id = i;  // re-map the ids to the array index.
@@ -271,6 +274,10 @@ function Butterfly() {
     this.container.remove();
     delete this.container;
     delete this;
+  };
+  this.injure = function() {
+    // console.debug('butterfly[' + this.id + '] (health = ' + this.health + ' says "Ouch!"');
+    this.health--;
   };
   this.senses = {
     left_eye: new EyeSense(this, 'left'),
@@ -300,8 +307,7 @@ function Butterfly() {
     if (this.no_collisions(new_pos)) {
       this.container.offset(new_pos);
     } else {
-      // console.log('butterfly[' + this.id + '] (health = ' + this.health + ' says "Ouch!"');
-      this.health--;
+      this.injure();
     }
     this.last_update = update_time;
   };
@@ -322,7 +328,7 @@ function Butterfly() {
     if (this.speed > 0) this.speed--;
   };
   this.go = function() {
-    // console.log("performing lifecycle actions for butterfly " + this.id, this);
+    // console.debug("performing lifecycle actions for butterfly " + this.id, this);
     // check health
     if (this.health < 0) {
       this.die();
@@ -341,7 +347,7 @@ function Butterfly() {
         urge_index = randomInt(urges.length) - 1;
         urge_name = urges[urge_index];
         urge = this.urges[urge_name];
-        // console.log('running urge[' + urge_index + '] (' + urge_name + ')', urge);
+        // console.debug('running urge[' + urge_index + '] (' + urge_name + ')', urge);
         urge.go();
         urges.splice(urge_index,1);
       }
@@ -364,7 +370,7 @@ function Butterfly() {
         win = $(window);
         max_x = win.width() - 123,
         max_y = win.height() - 123;
-    // console.log('x = ' + x + '/' + max_x + ', y = ' + y + '/'+ max_y); 
+    // console.debug('x = ' + x + '/' + max_x + ', y = ' + y + '/'+ max_y); 
     // check page edges.
     if (x < 0 || x > max_x || y < 0 || y > max_y) return false;
   
@@ -387,23 +393,30 @@ function lifecycle() {
   setTimeout(lifecycle, 20);
 }
 
+function update_mouse(event) {
+  var e = event.originalEvent;
+  MOUSE = {left: e.pageX, top: e.pageY};
+  $("#light").css({
+    top: e.pageY - 100,
+    left: e.pageX - 100,
+    display: (MOUSE.left <= 0 && MOUSE.top <= 0) ? 'none' : 'block'
+  });
+}
+
 $(document).ready(function() {
   $("body").css({
-    'cursor': "none",
-    'background': 'url(images/starfield' + (window.devicePixelRatio > 1 ? '@2x' : '') + '.jpg) no-repeat center center fixed',
+    margin:0,
+    padding:0,
+    cursor: 'none',
+    background: 'url(images/starfield' + (is_retina ? '@2x' : '') + '.jpg) no-repeat center center fixed',
     'background-size': 'cover',
-    'overflow': 'hidden'
-  }).append($('<div id="light" style="position:absolute; width: 100px; height: 100px; top: 0px; left: 0px; background-image:url(images/light' +
-                (window.devicePixelRatio > 1 ? '@2x' : '') + '.png); background-position: center; background-repeat: no-repeat"></div>'));
+    overflow: 'hidden'
+  }).append($('<div id="light" style="margin:0; padding:0; position:absolute; width: 200px; height: 200px; top: 0px; left: 0px; background:url(images/light' +
+                (is_retina ? '@2x' : '') + '.png) no-repeat center center; background-size: 200px; display:none;"></div>'));
 
-  $(document).mousemove(function(event) {
-    MOUSE = {left: event.pageX, top: event.pageY};
-    $("#light").css({
-      top: event.pageY - 50,
-      left: event.pageX - 50
-    });
-  });
-  
+  $(document).mousemove(update_mouse);
+  $(document).bind('touchstart', update_mouse);
+
   force_load_all_sprites();
   lifecycle();
   
